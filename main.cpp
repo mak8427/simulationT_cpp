@@ -1,69 +1,89 @@
 #include <iostream>
+#include <vector>
 #include <random>
 #include <chrono>
-#include <vector>
+#include <numeric>
+#include <algorithm>
+#include <cmath>
+#include <iterator>
 #include "Product.h"
 #include "Consumer.h"
+#include "util.h"
 
-std::vector<Product> create_products() {
-    std::vector<Product> products;
-    for (int i = 0; i < 3; ++i) {
-        products.push_back(Product(i));
-    }
-    return products;
-}
+void buy_product_for_agent(Consumer& agent, std::vector<Product>& product_list) {
+    double best = 0;
+    int best_product = -1;
 
-std::vector<Consumer> create_consumers() {
-    // Set mean and standard deviation
-    double mu = 400;
-    double sigma = 200;
-
-    // Generate random data from a left-skewed distribution using C++ random library
-    std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
-    std::gamma_distribution<double> distribution(6, 100);
-    std::vector<double> data(100000);
-    for (double& d : data) {
-        d = distribution(generator);
-    }
-    double mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
-    double stdev = std::sqrt(std::inner_product(data.begin(), data.end(), data.begin(), 0.0) / data.size() - mean * mean);
-    for (double& d : data) {
-        d = (d - mean) / stdev * sigma + mu;
-    }
-
-    // Create 10000 consumers with random capital from data
-    std::vector<Consumer> consumers;
-    for (int i = 0; i < 10000; ++i) {
-        consumers.push_back(Consumer(data));
-    }
-    return consumers;
-}
-
-void simulate() {
-    auto products = create_products();
-    auto consumers = create_consumers();
-    for (int i = 0; i < 10; ++i) {
-        auto s1 = std::chrono::system_clock::now();
-
-        buy_product_multiprocessed(consumers, products);
-
-        compute_profit(products);
-        auto s2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - s1).count();
-        auto t1 = std::chrono::system_clock::now();
-        for (auto& product : products) {
-            product.new_product();
+    for (size_t i = 0; i < product_list.size(); ++i) {
+        if (agent.get_capital() > product_list[i].get_selling_price() && product_list[i].get_number_sold() < product_list[i].get_number_produced()) {
+            double tmp = agent.product_score(product_list[i]);
+            if (tmp > best) {
+                best = tmp;
+                best_product = static_cast<int>(i);
+            }
         }
-        auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - t1).count();
-
-        std::cout << "proportion of time spent in buy_product: " << static_cast<double>(s2) / t2 << '\n';
     }
-    for (const auto& product : products) {
-        std::cout << "profit of product " << product.get_id() << " is " << std::accumulate(product.get_profit_history().begin(), product.get_profit_history().end(), 0.0) << '\n';
+
+    if (best != 0 && best_product >= 0) {
+        product_list[best_product].increment_number_sold();
+        agent.update_agent_preference();
+    }
+}
+
+void buy_product_for_agents(std::vector<Consumer>& agent_list, std::vector<Product>& product_list) {
+    for (Consumer& agent : agent_list) {
+        buy_product_for_agent(agent, product_list);
+    }
+}
+
+void compute_profit(const std::vector<Product>& product_list) {
+    for (const Product& product : product_list) {
+        std::cout << "profit of product " << product.get_seller_id() << " is " << product.calculate_profit() << std::endl;
     }
 }
 
 int main() {
-    simulate();
-    std::cout << "fine\n";
+    // Set mean and standard deviation
+    double mu = 400.0;
+    double sigma = 200.0;
+
+    // Generate random data from a left-skewed distribution using std
+    std::gamma_distribution<> gamma(6, 100);
+    std::vector<double> data(100000);
+    std::generate(data.begin(), data.end(), [&]() { return gamma(gen); });
+    double data_mean = std::accumulate(data.begin(), data.end(), 0.0) / data.size();
+    double data_stddev = std::sqrt(
+            std::inner_product(data.begin(), data.end(), data.begin(), 0.0) / data.size() - std::pow(data_mean, 2));
+    for (double &value: data) {
+        value = ((value - data_mean) / data_stddev) * sigma + mu;
+    }
+
+    // Create 3 products with random values
+    std::vector<Product> product_list = {Product(0), Product(1), Product(2)};
+    std::vector<Consumer> agent_list(10000, Consumer(data));
+
+    for (int x = 0; x < 10; ++x) {
+        auto start1 = std::chrono::high_resolution_clock::now();
+        buy_product_for_agents(agent_list, product_list);
+        compute_profit(product_list);
+        auto end1 = std::chrono::high_resolution_clock::now();
+        auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count();
+
+        auto start2 = std::chrono::high_resolution_clock::now();
+        for (Product &product: product_list) {
+            product.new_product();
+        }
+        auto end2 = std::chrono::high_resolution_clock::now();
+        auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2).count();
+        std::cout << "proportion of time spent in buy_product: "
+                  << static_cast<double>(duration1) / static_cast<double>(duration2) << std::endl;
+    }
+
+    for (const Product &product: product_list) {
+        std::cout << "Total profit for product " << product.get_seller_id() << ": "
+                  << std::accumulate(product.get_profit_history().begin(), product.get_profit_history().end(), 0)
+                  << std::endl;
+    }
+
     return 0;
 }

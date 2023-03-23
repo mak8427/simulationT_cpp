@@ -6,23 +6,21 @@
 #define SIMULATIONT_CONSUMER_H
 
 
-#include <cstdlib>
-#include <ctime>
-#include <cmath>
-#include <map>
 #include <vector>
+#include <map>
 #include "Product.h"
 
 class Consumer {
 public:
-    Consumer(const std::vector<double>& data);
-
-    double product_score(Product& product);
-
-    void capital_change(std::vector<double>& data);
-
+    explicit Consumer(const std::vector<double>& data);
+    double product_score(const Product& product);
+    void capital_change(const std::vector<double>& data);
     void update_agent_preference();
+    int get_capital() const;
+    const std::vector<int>& get_agent_10y_history() const;
+    const std::map<int, double>& get_agent_preference_seller() const;
 
+private:
     double capital;
     std::vector<int> agent_10y_history;
     std::map<int, double> agent_preference_seller;
