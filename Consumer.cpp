@@ -2,7 +2,7 @@
 #include "util.h"
 #include <random>
 #include <iostream>
-
+#include <algorithm>
 
 
 double rand_choice(const std::vector<double>& data) {
