@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <string>
 #include <vector>
 
 class Product {
