@@ -1,7 +1,7 @@
 #include "Consumer.h"
 #include "util.h"
 #include <random>
-
+#include <iostream>
 
 
 
